@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional
 
-file_path = "tata-supply-chain/Smart MRP_StatSampled.xlsx"
+file_path = "Smart MRP_StatSampled.xlsx"
 df = pd.read_excel(file_path)
 
 print("Dataset Loaded:", df.shape)
@@ -178,6 +178,10 @@ r2 = r2_score(y_true, pred)
 
 mape = np.mean(np.abs((y_true - pred) / y_true)) * 100
 
+import joblib
+
+joblib.dump(scalerX, "scalerX.pkl")
+joblib.dump(scalery, "scalery.pkl")
 
 print("\nModel Evaluation")
 print("------------------")
@@ -187,7 +191,7 @@ print("MAE :", mae)
 print("R2 :", r2)
 print("MAPE:", mape)
 
-
+model.save("mrp_lstm_model.h5")
 # 11 GET LAST PREDICTION PER MATERIAL
 
 pred_list = pred.flatten()
@@ -231,16 +235,16 @@ results["Reorder Qty"] = (
     - results["Open PO"]
 )
 
-# 13 SAVE RESULTS
+# SAVE RESULTS
 
-results.to_excel("tata-supply-chain/MRP_AI_Predictions.xlsx", index=False)
+results.to_excel("MRP_AI_Predictions.xlsx", index=False)
 
 scores = pd.DataFrame({
     "Metric":["MSE","RMSE","MAE","R2","MAPE"],
     "Value":[mse,rmse,mae,r2,mape]
 })
 
-scores.to_excel("tata-supply-chain/MRP_Model_Scores.xlsx", index=False)
+scores.to_excel("MRP_Model_Scores.xlsx", index=False)
 
 print("\nResults saved:")
 print("MRP_AI_Predictions.xlsx")
