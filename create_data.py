@@ -1,10 +1,3 @@
-"""
-MRP Dummy Data Statistical Sampler
-===================================
-Learns distributions from existing rows per Mat Type (FERT/HALB/ROH)
-and generates N new realistic rows by sampling from those distributions.
-"""
-
 import pandas as pd
 import numpy as np
 from openpyxl import load_workbook
@@ -66,7 +59,7 @@ for mat_type, grp in df.groupby('Mat Type'):
         vals = grp[col].dropna().tolist()
         cat_profiles[mat_type][col] = vals  # sample uniformly
 
-# ── 4. Sampling helpers ───────────────────────────────────────────────────────
+#4. Sampling helpers
 
 def sample_int(prof, col, lo=None, hi=None):
     p = prof.get(col)
