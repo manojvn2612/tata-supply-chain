@@ -27,7 +27,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY not set. LLM features will not work.")
 
-app = FastAPI(title="Supply Chain AI", version="1.0.0")
+app = FastAPI(title="Supply Chain AI", version="1.0.0", docs_url = None, redoc_url = None, openapi_url = "/openapi.json")
 
 app.add_middleware(
     CORSMiddleware,
