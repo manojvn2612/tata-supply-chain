@@ -13,7 +13,7 @@ os.environ["OPENROUTER_API_KEY"] = os.getenv("OPENROUTER_API_KEY")
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Supply Chain AI",
-    page_icon="🔗",
+    page_icon="T",
     layout="wide",
     initial_sidebar_state="expanded",
 )
