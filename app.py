@@ -215,7 +215,8 @@ def import_from_path(module_name, file_path, func_name):
     spec.loader.exec_module(module)
     return getattr(module, func_name)
 
-base_dir = os.path.join(os.path.dirname(__file__), 'tata-supply-chain')
+# base_dir = os.path.join(os.path.dirname(__file__), 'tata-supply-chain')
+base_dir = ""
 
 run_lstm_demand_forecast = import_from_path(
     'lstm_train', os.path.join(base_dir, 'lstm_train.py'), 'run_lstm_demand_forecast')
