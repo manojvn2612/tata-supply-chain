@@ -8,9 +8,9 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Bidirectional
 
-MODEL_PATH = "lstm_model.h5"
-SCALER_X_PATH = "scalerX.save"
-SCALER_Y_PATH = "scalerY.save"
+MODEL_PATH = "model_weights/lstm_model.h5"
+SCALER_X_PATH = "model_weights/scalerX.save"
+SCALER_Y_PATH = "model_weights/scalerY.save"
 
 # -----------------------------
 # Helpers
