@@ -30,7 +30,6 @@ def run_supplier_risk(df):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Use fewer clusters if not enough samples
     n_samples = len(df)
     n_clusters = min(3, max(2, n_samples - 1))
 
@@ -43,7 +42,6 @@ def run_supplier_risk(df):
     risk_map = {sorted_clusters[i]: risk_labels[i] for i in range(n_clusters)}
     df["Supplier_Risk"] = df["Cluster"].map(risk_map)
 
-    # Silhouette score needs at least 2 clusters and 2 samples per cluster
     try:
         score = silhouette_score(X_scaled, df["Cluster"])
     except Exception:
