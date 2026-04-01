@@ -29,15 +29,24 @@ def run_supplier_risk(df):
     X = df[features]
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    kmeans = KMeans(n_clusters=3, random_state=42)
+
+    # Use fewer clusters if not enough samples
+    n_samples = len(df)
+    n_clusters = min(3, max(2, n_samples - 1))
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     df["Cluster"] = kmeans.fit_predict(X_scaled)
     cluster_mean = df.groupby("Cluster")["Total_Time"].mean()
     sorted_clusters = cluster_mean.sort_values().index
-    risk_map = {
-        sorted_clusters[0]: "Low Risk",
-        sorted_clusters[1]: "Medium Risk",
-        sorted_clusters[2]: "High Risk"
-    }
+
+    risk_labels = ["Low Risk", "Medium Risk", "High Risk"]
+    risk_map = {sorted_clusters[i]: risk_labels[i] for i in range(n_clusters)}
     df["Supplier_Risk"] = df["Cluster"].map(risk_map)
-    score = silhouette_score(X_scaled, df["Cluster"])
+
+    # Silhouette score needs at least 2 clusters and 2 samples per cluster
+    try:
+        score = silhouette_score(X_scaled, df["Cluster"])
+    except Exception:
+        score = 0.0
+
     return df, score
