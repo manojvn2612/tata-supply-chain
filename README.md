@@ -46,6 +46,9 @@ Endpoints = for backend
 2. In frontend/:
 3. Open http://localhost:5173 in your browser.
 
+# Images
+![frontend](https://github.com/user-attachments/assets/767a1117-2225-4e3e-a835-eb367e189072)
+
 Made By students of MIT WPU
 - [Manoj Nayak](https://github.com/manojvn2612)
 - [Shalaka Bhor](https://github.com/catana-11)
