@@ -6,6 +6,7 @@ const SUGGESTIONS = [
   "What is the demand forecast for all materials?",
   "Show stockout risk for all materials",
   "Cluster supplier risk",
+  "Optimize inventory policy and strategy",
   "What is safety stock?",
 ];
 
@@ -499,6 +500,32 @@ function BarChart({ data, labelKey, valueKey, color, t, height = 160 }) {
   );
 }
 
+function PolicyCompareChart({ naive, smart, label, color, t, suffix = "" }) {
+  const max = Math.max(naive, smart, 1);
+  const naivePct = (naive / max) * 100;
+  const smartPct = (smart / max) * 100;
+  const better = smart <= naive;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: "0.72rem", color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <div style={{ width: 52, fontSize: "0.7rem", color: t.textSub, flexShrink: 0 }}>Naive</div>
+        <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 4, height: 18, overflow: "hidden" }}>
+          <div style={{ width: `${naivePct}%`, height: "100%", background: t.danger, borderRadius: 4, transition: "width .6s ease" }} />
+        </div>
+        <div style={{ width: 80, fontSize: "0.72rem", color: t.textSub, textAlign: "right", flexShrink: 0 }}>{typeof naive === "number" ? naive.toLocaleString(undefined, {maximumFractionDigits:1}) : naive}{suffix}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 52, fontSize: "0.7rem", color: t.textSub, flexShrink: 0 }}>Smart</div>
+        <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 4, height: 18, overflow: "hidden" }}>
+          <div style={{ width: `${smartPct}%`, height: "100%", background: better ? t.positive : t.danger, borderRadius: 4, transition: "width .6s ease" }} />
+        </div>
+        <div style={{ width: 80, fontSize: "0.72rem", color: better ? t.positive : t.danger, textAlign: "right", fontWeight: 500, flexShrink: 0 }}>{typeof smart === "number" ? smart.toLocaleString(undefined, {maximumFractionDigits:1}) : smart}{suffix}</div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard({ t, sessionId, onBack, mode }) {
   const [demandData,   setDemandData]   = useState(null);
   const [riskData,     setRiskData]     = useState(null);
@@ -506,6 +533,11 @@ function Dashboard({ t, sessionId, onBack, mode }) {
   const [riskLoading,   setRiskLoading]   = useState(false);
   const [demandDone,   setDemandDone]   = useState(false);
   const [riskDone,     setRiskDone]     = useState(false);
+
+  // Policy Optimization state
+  const [policyData,    setPolicyData]    = useState(null);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyDone,    setPolicyDone]    = useState(false);
 
   const runDemand = async () => {
     setDemandLoading(true);
@@ -557,6 +589,52 @@ function Dashboard({ t, sessionId, onBack, mode }) {
       setRiskData({ error: e.message });
     } finally {
       setRiskLoading(false);
+    }
+  };
+
+  const runPolicy = async () => {
+    setPolicyLoading(true);
+    try {
+      const res = await fetch(`${API}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, question: "optimize policy strategy best policy" }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+      const data = await res.json();
+      // Parse key numbers from raw_output for KPI cards
+      const raw = data.raw_output || "";
+      const grab = (label) => {
+        const m = raw.match(new RegExp(label + "\\s*:\\s*([\\d,.$%↓↑ a-zA-Z]+)"));
+        return m ? m[1].trim() : "—";
+      };
+      setPolicyData({
+        raw: raw,
+        answer: data.answer,
+        costSavings:    grab("Cost Savings"),
+        stockoutReduce: grab("Stockout Reduction"),
+        recommended:    grab("RECOMMENDED"),
+        safetyStock:    grab("Safety Stock"),
+        rop:            grab("Reorder Point"),
+        orderQty:       grab("Order Quantity"),
+        leadTime:       grab("Lead Time"),
+        serviceLevel:   grab("Service Level"),
+        supplierRisk:   grab("Supplier Risk"),
+        // Naive metrics
+        naiveCost:      parseFloat(grab("Total Cost").replace(/[$,]/g, "")) || 0,
+        naiveStockouts: parseInt(grab("Total Stockouts")) || 0,
+        naiveAvgInv:    parseFloat(grab("Avg Inventory")) || 0,
+        // Smart metrics — grabbed after second occurrence
+        smartCost:      (() => { const m = [...raw.matchAll(/Total Cost\s*:\s*\$([\d,.]+)/g)]; return m[1] ? parseFloat(m[1][1].replace(/,/g, "")) : 0; })(),
+        smartStockouts: (() => { const m = [...raw.matchAll(/Total Stockouts\s*:\s*(\d+)/g)]; return m[1] ? parseInt(m[1][1]) : 0; })(),
+        smartAvgInv:    (() => { const m = [...raw.matchAll(/Avg Inventory\s*:\s*([\d.]+)/g)]; return m[1] ? parseFloat(m[1][1]) : 0; })(),
+      });
+      setPolicyDone(true);
+    } catch (e) {
+      setPolicyData({ error: e.message });
+      setPolicyDone(true);
+    } finally {
+      setPolicyLoading(false);
     }
   };
 
@@ -615,6 +693,9 @@ function Dashboard({ t, sessionId, onBack, mode }) {
               <Btn onClick={runRisk} disabled={riskLoading || !sessionId} variant="primary" t={t}>
                 {riskLoading ? <><SpinnerIcon /> Analyzing...</> : "Analyze Supplier Risk"}
               </Btn>
+              <Btn onClick={runPolicy} disabled={policyLoading || !sessionId} variant="primary" t={t}>
+                {policyLoading ? <><SpinnerIcon /> Optimizing...</> : "Run Policy Optimization"}
+              </Btn>
             </div>
 
             {/* KPIs */}
@@ -627,6 +708,7 @@ function Dashboard({ t, sessionId, onBack, mode }) {
                   <KpiCard label="Total Materials" value={demandRows.length || "—"}             sub="in dataset"            t={t} />
                   <KpiCard label="Reorder Alerts"  value={criticalItems.length || "—"}          sub="need reorder"          t={t} />
                   {riskDone && <KpiCard label="High-Risk Items" value={highRisk.length || "0"} sub="stockout &gt; 30%" t={t} />}
+                  {policyDone && policyData?.costSavings && <KpiCard label="Policy Savings" value={policyData.costSavings} sub="smart vs naive" t={t} />}
                 </div>
               </>
             )}
@@ -700,8 +782,94 @@ function Dashboard({ t, sessionId, onBack, mode }) {
               </>
             )}
 
+            {/* ── Policy Optimization Section ─────────────────────────────── */}
+            {policyDone && policyData && !policyData.error && (
+              <>
+                <SectionHeader title="Policy Optimization" t={t} />
+
+                {/* Recommendation banner */}
+                <div style={{
+                  background: policyData.recommended?.includes("Smart") ? t.positiveBg : t.surfaceAlt,
+                  border: `1px solid ${policyData.recommended?.includes("Smart") ? t.positive + "40" : t.border}`,
+                  borderRadius: 10, padding: "14px 20px", marginBottom: 16,
+                  display: "flex", alignItems: "center", gap: 14,
+                }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: policyData.recommended?.includes("Smart") ? t.positive : t.accent, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: "0.72rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Recommended Policy</div>
+                    <div style={{ fontSize: "1rem", fontWeight: 600, color: t.text, fontFamily: "'Lora', serif" }}>{policyData.recommended || "Smart Policy"}</div>
+                  </div>
+                </div>
+
+                {/* KPI cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+                  <KpiCard label="Cost Savings"       value={policyData.costSavings}    sub="vs naive policy"   t={t} />
+                  <KpiCard label="Stockout Reduction"  value={policyData.stockoutReduce} sub="fewer events"      t={t} />
+                  <KpiCard label="Safety Stock"        value={policyData.safetyStock}    sub="units buffer"      t={t} />
+                  <KpiCard label="Reorder Point"       value={policyData.rop}            sub="units trigger"     t={t} />
+                  <KpiCard label="Order Quantity"      value={policyData.orderQty}       sub="units per order"   t={t} />
+                  <KpiCard label="Service Level"       value={policyData.serviceLevel}   sub="target fill rate"  t={t} />
+                </div>
+
+                {/* Side-by-side comparison bars */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                  <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "18px 20px", boxShadow: t.shadow }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 500, color: t.text, marginBottom: 14 }}>Cost Comparison</div>
+                    <PolicyCompareChart naive={policyData.naiveCost}      smart={policyData.smartCost}      label="Total Cost ($)"     t={t} />
+                    <PolicyCompareChart naive={policyData.naiveStockouts} smart={policyData.smartStockouts} label="Stockout Events"    t={t} />
+                    <PolicyCompareChart naive={policyData.naiveAvgInv}    smart={policyData.smartAvgInv}    label="Avg Inventory (units)" t={t} />
+                  </div>
+                  <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "18px 20px", boxShadow: t.shadow }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 500, color: t.text, marginBottom: 14 }}>Policy Parameters</div>
+                    {[
+                      ["Reorder Point",   policyData.rop],
+                      ["Order Quantity",  policyData.orderQty],
+                      ["Safety Stock",    policyData.safetyStock],
+                      ["Lead Time",       policyData.leadTime],
+                      ["Service Level",   policyData.serviceLevel],
+                      ["Supplier Risk",   policyData.supplierRisk],
+                    ].map(([label, val]) => (
+                      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${t.borderSoft}` }}>
+                        <span style={{ fontSize: "0.78rem", color: t.textMuted }}>{label}</span>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 500, color: t.text }}>{val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Raw model output */}
+                <details style={{ marginBottom: 14 }}>
+                  <summary style={{ fontSize: "0.72rem", color: t.textMuted, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, userSelect: "none" }}>
+                    View raw simulation output
+                  </summary>
+                  <div style={{ background: t.rawBg, border: `1px solid ${t.border}`, borderRadius: 8, padding: "14px 16px", fontFamily: "monospace", fontSize: "0.76rem", color: t.rawText, whiteSpace: "pre-wrap", maxHeight: 280, overflowY: "auto", marginTop: 8 }}>
+                    {policyData.raw}
+                  </div>
+                </details>
+
+                {/* AI summary */}
+                {policyData.answer && (
+                  <div style={{ background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 10, padding: "14px 16px", fontSize: "0.85rem", color: t.textSub, lineHeight: 1.65 }}>
+                    <div style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>AI Recommendation</div>
+                    <div dangerouslySetInnerHTML={{
+                      __html: policyData.answer
+                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                        .replace(/\n/g, "<br>")
+                    }} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {policyDone && policyData?.error && (
+              <div style={{ background: t.dangerBg, border: `1px solid ${t.danger}30`, borderRadius: 10, padding: "14px 18px", marginTop: 10, fontSize: "0.84rem", color: t.danger }}>
+                Policy optimization error: {policyData.error}
+              </div>
+            )}
+
             {/* Empty state */}
-            {!demandDone && !riskDone && !demandLoading && !riskLoading && (
+            {!demandDone && !riskDone && !policyDone && !demandLoading && !riskLoading && !policyLoading && (
               <div style={{ textAlign: "center", padding: "60px 20px", color: t.textMuted }}>
                 <div style={{ fontFamily: "'Lora', serif", fontSize: "1.1rem", color: t.textSub, marginBottom: 8 }}>Ready to analyse</div>
                 <div style={{ fontSize: "0.85rem" }}>Click one of the buttons above to run your models.</div>
