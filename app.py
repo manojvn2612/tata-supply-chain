@@ -1,4 +1,3 @@
-from policy_optimizer import optimize_policy, format_policy_output
 import logging
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,10 +10,11 @@ import importlib.util
 import uuid
 from typing import Optional
 import dotenv
-# NEW
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from src.policy_optimizer import optimize_policy, format_policy_output
+
 
 logging.basicConfig(
     level=logging.INFO,
