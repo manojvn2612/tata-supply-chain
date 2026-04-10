@@ -143,22 +143,85 @@ const DownloadIcon = () => (
     <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
   </svg>
 );
+const ImageIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+);
 
-// ── Tiny sparkline SVG chart ───────────────────────────────────────────────────
-function Sparkline({ values, color, width = 120, height = 36 }) {
-  if (!values?.length) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * width;
-    const y = height - ((v - min) / range) * (height - 4) - 2;
-    return `${x},${y}`;
-  }).join(" ");
+// ── Graph image with download button ─────────────────────────────────────────
+function GraphImage({ base64, t, label = "chart" }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = `data:image/png;base64,${base64}`;
+    a.download = `supply_chain_${label}_${Date.now()}.png`;
+    a.click();
+  };
+
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div style={{ marginTop: 12 }}>
+      {/* Toolbar */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 6,
+      }}>
+        <span style={{ fontSize: "0.7rem", color: t.textMuted, display: "flex", alignItems: "center", gap: 4 }}>
+          <ImageIcon /> Analysis Chart
+        </span>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            style={{
+              background: t.surfaceAlt, border: `1px solid ${t.border}`,
+              borderRadius: 6, padding: "3px 9px", cursor: "pointer",
+              fontSize: "0.7rem", color: t.textSub, fontFamily: "'DM Sans', sans-serif",
+              display: "flex", alignItems: "center", gap: 4, transition: "all .15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = t.textMuted; e.currentTarget.style.color = t.text; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.textSub; }}
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
+          <button
+            onClick={handleDownload}
+            style={{
+              background: t.accent, border: "none",
+              borderRadius: 6, padding: "3px 9px", cursor: "pointer",
+              fontSize: "0.7rem", color: t.accentText, fontFamily: "'DM Sans', sans-serif",
+              display: "flex", alignItems: "center", gap: 4, transition: "opacity .15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+          >
+            <DownloadIcon /> Download
+          </button>
+        </div>
+      </div>
+
+      {/* Image */}
+      <div style={{
+        border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden",
+        background: "#fff", cursor: "pointer",
+        maxHeight: expanded ? "none" : 320,
+        transition: "max-height .3s ease",
+      }}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <img
+          src={`data:image/png;base64,${base64}`}
+          alt="Analysis chart"
+          style={{ width: "100%", display: "block", objectFit: "contain" }}
+        />
+      </div>
+      {!expanded && (
+        <div style={{ textAlign: "center", fontSize: "0.68rem", color: t.textMuted, marginTop: 3 }}>
+          Click to expand
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -357,6 +420,14 @@ function Sidebar({ t, meta, onUpload, onSuggestion, onClear, loading }) {
 // ── Message bubble ─────────────────────────────────────────────────────────────
 function Message({ msg, t }) {
   const isUser = msg.role === "user";
+
+  // Determine graph label from content
+  const graphLabel = msg.content?.toLowerCase().includes("demand") ? "demand_forecast"
+    : msg.content?.toLowerCase().includes("stockout") ? "stockout_risk"
+    : msg.content?.toLowerCase().includes("supplier") ? "supplier_risk"
+    : msg.content?.toLowerCase().includes("policy") ? "policy_optimization"
+    : "analysis";
+
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", margin: "10px 0", animation: "fadeUp .2s ease both" }}>
       {isUser ? (
@@ -367,7 +438,7 @@ function Message({ msg, t }) {
           fontSize: "0.88rem", lineHeight: 1.6, boxShadow: t.shadow,
         }}>{msg.content}</div>
       ) : (
-        <div style={{ maxWidth: "75%" }}>
+        <div style={{ maxWidth: "80%" }}>
           <div style={{
             padding: "12px 16px",
             background: t.aiBubble, color: t.aiText,
@@ -377,24 +448,41 @@ function Message({ msg, t }) {
           }}>
             {msg.typing ? <TypingDots t={t} /> : (
               <>
-                {msg.raw && (
-                  <div style={{
-                    background: t.rawBg, borderRadius: 6, padding: "10px 12px",
-                    marginBottom: 12, fontFamily: "monospace",
-                    fontSize: "0.76rem", color: t.rawText,
-                    whiteSpace: "pre-wrap", wordBreak: "break-all",
-                    maxHeight: 180, overflowY: "auto", border: `1px solid ${t.border}`,
-                  }}>
-                    <div style={{ fontSize: "0.65rem", color: t.textMuted, marginBottom: 5, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Model output</div>
-                    {msg.raw}
-                  </div>
+                {/* Raw model output collapsible */}
+                {msg.raw_output && msg.raw_output.trim() && (
+                  <details style={{ marginBottom: 10 }}>
+                    <summary style={{
+                      fontSize: "0.7rem", color: t.textMuted, cursor: "pointer",
+                      textTransform: "uppercase", letterSpacing: "0.06em", userSelect: "none",
+                    }}>
+                      Raw model output
+                    </summary>
+                    <div style={{
+                      background: t.rawBg, borderRadius: 6, padding: "10px 12px",
+                      marginTop: 6, fontFamily: "monospace", fontSize: "0.73rem",
+                      color: t.rawText, whiteSpace: "pre-wrap",
+                      maxHeight: 200, overflowY: "auto",
+                      border: `1px solid ${t.border}`,
+                    }}>
+                      {msg.raw_output}
+                    </div>
+                  </details>
                 )}
+
+                {/* Main answer text */}
                 <div dangerouslySetInnerHTML={{
-                  __html: msg.content
-                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                  __html: (msg.content || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
                     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                     .replace(/\n/g, "<br>")
                 }} />
+
+                {/* Graph with download */}
+                {msg.graph && (
+                  <GraphImage base64={msg.graph} t={t} label={graphLabel} />
+                )}
               </>
             )}
           </div>
@@ -474,33 +562,7 @@ function AlertBanner({ count, t }) {
   );
 }
 
-function BarChart({ data, labelKey, valueKey, color, t, height = 160 }) {
-  if (!data?.length) return null;
-  const max = Math.max(...data.map(d => d[valueKey])) || 1;
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height, padding: "0 4px" }}>
-      {data.slice(0, 14).map((d, i) => {
-        const pct = (d[valueKey] / max) * 100;
-        return (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, height: "100%" }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "flex-end", width: "100%" }}>
-              <div style={{
-                width: "100%", height: `${pct}%`, minHeight: 2,
-                background: color, borderRadius: "3px 3px 0 0",
-                transition: "height .4s ease",
-              }} title={`${d[labelKey]}: ${d[valueKey]}`} />
-            </div>
-            <div style={{ fontSize: "0.58rem", color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" }}>
-              {String(d[labelKey]).slice(0, 6)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PolicyCompareChart({ naive, smart, label, color, t, suffix = "" }) {
+function PolicyCompareChart({ naive, smart, label, t }) {
   const max = Math.max(naive, smart, 1);
   const naivePct = (naive / max) * 100;
   const smartPct = (smart / max) * 100;
@@ -513,129 +575,160 @@ function PolicyCompareChart({ naive, smart, label, color, t, suffix = "" }) {
         <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 4, height: 18, overflow: "hidden" }}>
           <div style={{ width: `${naivePct}%`, height: "100%", background: t.danger, borderRadius: 4, transition: "width .6s ease" }} />
         </div>
-        <div style={{ width: 80, fontSize: "0.72rem", color: t.textSub, textAlign: "right", flexShrink: 0 }}>{typeof naive === "number" ? naive.toLocaleString(undefined, {maximumFractionDigits:1}) : naive}{suffix}</div>
+        <div style={{ width: 80, fontSize: "0.72rem", color: t.textSub, textAlign: "right", flexShrink: 0 }}>
+          {typeof naive === "number" ? naive.toLocaleString(undefined, { maximumFractionDigits: 1 }) : naive}
+        </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ width: 52, fontSize: "0.7rem", color: t.textSub, flexShrink: 0 }}>Smart</div>
         <div style={{ flex: 1, background: t.surfaceAlt, borderRadius: 4, height: 18, overflow: "hidden" }}>
           <div style={{ width: `${smartPct}%`, height: "100%", background: better ? t.positive : t.danger, borderRadius: 4, transition: "width .6s ease" }} />
         </div>
-        <div style={{ width: 80, fontSize: "0.72rem", color: better ? t.positive : t.danger, textAlign: "right", fontWeight: 500, flexShrink: 0 }}>{typeof smart === "number" ? smart.toLocaleString(undefined, {maximumFractionDigits:1}) : smart}{suffix}</div>
+        <div style={{ width: 80, fontSize: "0.72rem", color: better ? t.positive : t.danger, textAlign: "right", fontWeight: 500, flexShrink: 0 }}>
+          {typeof smart === "number" ? smart.toLocaleString(undefined, { maximumFractionDigits: 1 }) : smart}
+        </div>
       </div>
     </div>
   );
 }
 
-function Dashboard({ t, sessionId, onBack, mode }) {
-  const [demandData,   setDemandData]   = useState(null);
-  const [riskData,     setRiskData]     = useState(null);
-  const [demandLoading, setDemandLoading] = useState(false);
-  const [riskLoading,   setRiskLoading]   = useState(false);
-  const [demandDone,   setDemandDone]   = useState(false);
-  const [riskDone,     setRiskDone]     = useState(false);
+// ── Dashboard helper: parse JSON or text rows ─────────────────────────────────
+function parseRows(rawOutput) {
+  if (!rawOutput) return [];
+  try {
+    const parsed = JSON.parse(rawOutput);
+    if (Array.isArray(parsed)) return parsed;
+  } catch (_) { /* not JSON */ }
+  return rawOutput.split("\n").filter(Boolean).map(line => {
+    const obj = {};
+    line.split(", ").forEach(part => {
+      const [k, ...v] = part.split(": ");
+      if (k?.trim()) obj[k.trim()] = v.join(": ").trim();
+    });
+    return obj;
+  }).filter(r => Object.keys(r).length > 1);
+}
 
-  // Policy Optimization state
-  const [policyData,    setPolicyData]    = useState(null);
-  const [policyLoading, setPolicyLoading] = useState(false);
-  const [policyDone,    setPolicyDone]    = useState(false);
+function Dashboard({ t, sessionId, onBack }) {
+  // 4 independent data buckets — one per button
+  const [demandData,      setDemandData]      = useState(null);
+  const [stockoutData,    setStockoutData]    = useState(null);
+  const [supplierData,    setSupplierData]    = useState(null);
+  const [policyData,      setPolicyData]      = useState(null);
+  const [demandLoading,   setDemandLoading]   = useState(false);
+  const [stockoutLoading, setStockoutLoading] = useState(false);
+  const [supplierLoading, setSupplierLoading] = useState(false);
+  const [policyLoading,   setPolicyLoading]   = useState(false);
+  const [demandDone,      setDemandDone]      = useState(false);
+  const [stockoutDone,    setStockoutDone]    = useState(false);
+  const [supplierDone,    setSupplierDone]    = useState(false);
+  const [policyDone,      setPolicyDone]      = useState(false);
 
+  const callAPI = async (question) => {
+    const res = await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, question }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "API error"); }
+    return res.json();
+  };
+
+  // ── Button 1: LSTM Demand Forecast ───────────────────────────────────────
   const runDemand = async () => {
     setDemandLoading(true);
     try {
-      const res = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, question: "run lstm demand forecast for all materials" }),
-      });
-      const data = await res.json();
-      // Parse raw model output into rows
-      const rows = (data.raw_output || "").split("\n").filter(Boolean).map(line => {
-        const obj = {};
-        line.split(", ").forEach(part => {
-          const [k, ...v] = part.split(": ");
-          if (k) obj[k.trim()] = v.join(": ").trim();
-        });
-        return obj;
-      }).filter(r => r["Material"]);
-      setDemandData({ rows, raw: data.raw_output, answer: data.answer });
+      // "demand" keyword → demand branch in backend
+      const data = await callAPI("What is the demand forecast for all materials?");
+      const rows = parseRows(data.raw_output); // raw_output is now JSON
+      setDemandData({ rows, answer: data.answer, graph: data.graph });
       setDemandDone(true);
     } catch (e) {
       setDemandData({ error: e.message });
-    } finally {
-      setDemandLoading(false);
-    }
+      setDemandDone(true);
+    } finally { setDemandLoading(false); }
   };
 
-  const runRisk = async () => {
-    setRiskLoading(true);
+  // ── Button 2: Monte Carlo Stockout Risk ──────────────────────────────────
+  const runStockout = async () => {
+    setStockoutLoading(true);
     try {
-      const res = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, question: "show stockout risk for all materials monte carlo simulation" }),
-      });
-      const data = await res.json();
-      const rows = (data.raw_output || "").split("\n").filter(Boolean).map(line => {
-        const obj = {};
-        line.split(", ").forEach(part => {
-          const [k, ...v] = part.split(": ");
-          if (k) obj[k.trim()] = v.join(": ").trim();
-        });
-        return obj;
-      }).filter(r => r["Material"]);
-      setRiskData({ rows, raw: data.raw_output, answer: data.answer });
-      setRiskDone(true);
+      // "stockout" keyword → stockout branch in backend (no "risk" collision issue now)
+      const data = await callAPI("Show stockout simulation for all materials");
+      const rows = parseRows(data.raw_output); // raw_output is now JSON
+      setStockoutData({ rows, answer: data.answer, graph: data.graph });
+      setStockoutDone(true);
     } catch (e) {
-      setRiskData({ error: e.message });
-    } finally {
-      setRiskLoading(false);
-    }
+      setStockoutData({ error: e.message });
+      setStockoutDone(true);
+    } finally { setStockoutLoading(false); }
   };
 
+  // ── Button 3: Supplier Risk Clustering ───────────────────────────────────
+  const runSupplier = async () => {
+    setSupplierLoading(true);
+    try {
+      // "supplier" keyword → supplier branch in backend (placed BEFORE stockout branch)
+      const data = await callAPI("Analyze supplier risk and cluster vendors");
+      const rows = parseRows(data.raw_output); // raw_output is now JSON
+      setSupplierData({ rows, answer: data.answer, graph: data.graph });
+      setSupplierDone(true);
+    } catch (e) {
+      setSupplierData({ error: e.message });
+      setSupplierDone(true);
+    } finally { setSupplierLoading(false); }
+  };
+
+  // ── Button 4: Policy Optimization ────────────────────────────────────────
   const runPolicy = async () => {
     setPolicyLoading(true);
     try {
-      const res = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, question: "optimize policy strategy best policy" }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
-      const data = await res.json();
-      // Parse key numbers from raw_output for KPI cards
+      const data = await callAPI("Optimize inventory policy and strategy");
       const raw = data.raw_output || "";
-      const grab = (label) => {
-        const m = raw.match(new RegExp(label + "\\s*:\\s*([\\d,.$%↓↑ a-zA-Z]+)"));
+
+      // Grab a single labelled value from the raw text output
+      // e.g. "Safety Stock      : 123.45 units"  →  "123.45 units"
+      const grabRaw = (label) => {
+        const m = raw.match(new RegExp(label + "\\s*:\\s*([^\\n]+)"));
         return m ? m[1].trim() : "—";
       };
+      // Grab only the numeric part (strips trailing text like " units" or " days")
+      const grabNum = (label) => {
+        const raw_val = grabRaw(label);
+        const m = raw_val.match(/[\d,.]+/);
+        return m ? m[0] : raw_val;
+      };
+
+      const allCosts     = [...raw.matchAll(/Total Cost\s*:\s*\$([\d,.]+)/g)];
+      const allStockouts = [...raw.matchAll(/Total Stockouts\s*:\s*(\d+)/g)];
+      const allAvgInv    = [...raw.matchAll(/Avg Inventory\s*:\s*([\d.]+)/g)];
+
       setPolicyData({
-        raw: raw,
-        answer: data.answer,
-        costSavings:    grab("Cost Savings"),
-        stockoutReduce: grab("Stockout Reduction"),
-        recommended:    grab("RECOMMENDED"),
-        safetyStock:    grab("Safety Stock"),
-        rop:            grab("Reorder Point"),
-        orderQty:       grab("Order Quantity"),
-        leadTime:       grab("Lead Time"),
-        serviceLevel:   grab("Service Level"),
-        supplierRisk:   grab("Supplier Risk"),
-        // Naive metrics
-        naiveCost:      parseFloat(grab("Total Cost").replace(/[$,]/g, "")) || 0,
-        naiveStockouts: parseInt(grab("Total Stockouts")) || 0,
-        naiveAvgInv:    parseFloat(grab("Avg Inventory")) || 0,
-        // Smart metrics — grabbed after second occurrence
-        smartCost:      (() => { const m = [...raw.matchAll(/Total Cost\s*:\s*\$([\d,.]+)/g)]; return m[1] ? parseFloat(m[1][1].replace(/,/g, "")) : 0; })(),
-        smartStockouts: (() => { const m = [...raw.matchAll(/Total Stockouts\s*:\s*(\d+)/g)]; return m[1] ? parseInt(m[1][1]) : 0; })(),
-        smartAvgInv:    (() => { const m = [...raw.matchAll(/Avg Inventory\s*:\s*([\d.]+)/g)]; return m[1] ? parseFloat(m[1][1]) : 0; })(),
+        raw,
+        answer:         data.answer,
+        graph:          data.graph,
+        recommended:    grabRaw("RECOMMENDED"),
+        safetyStock:    grabNum("Safety Stock"),
+        rop:            grabNum("Reorder Point"),
+        orderQty:       grabNum("Order Quantity"),
+        leadTime:       grabNum("Lead Time"),
+        serviceLevel:   grabRaw("Service Level"),
+        supplierRisk:   grabRaw("Supplier Risk"),
+        // Cost Savings line looks like: "$1,234.56 ↓ (saving)"
+        costSavings:    grabRaw("Cost Savings"),
+        stockoutReduce: grabRaw("Stockout Reduction"),
+        naiveCost:      allCosts[0]     ? parseFloat(allCosts[0][1].replace(/,/g, "")) : 0,
+        naiveStockouts: allStockouts[0] ? parseInt(allStockouts[0][1]) : 0,
+        naiveAvgInv:    allAvgInv[0]    ? parseFloat(allAvgInv[0][1]) : 0,
+        smartCost:      allCosts[1]     ? parseFloat(allCosts[1][1].replace(/,/g, "")) : 0,
+        smartStockouts: allStockouts[1] ? parseInt(allStockouts[1][1]) : 0,
+        smartAvgInv:    allAvgInv[1]    ? parseFloat(allAvgInv[1][1]) : 0,
       });
       setPolicyDone(true);
     } catch (e) {
       setPolicyData({ error: e.message });
       setPolicyDone(true);
-    } finally {
-      setPolicyLoading(false);
-    }
+    } finally { setPolicyLoading(false); }
   };
 
   const downloadCSV = (rows, filename) => {
@@ -648,13 +741,37 @@ function Dashboard({ t, sessionId, onBack, mode }) {
     a.click();
   };
 
-  // Derive KPIs
-  const demandRows = demandData?.rows || [];
-  const riskRows   = riskData?.rows   || [];
-  const avgDemand  = demandRows.length ? Math.round(demandRows.reduce((s, r) => s + parseFloat(r["Demand"] || r["Predicted Demand"] || 0), 0) / demandRows.length) : null;
-  const maxDemand  = demandRows.length ? Math.round(Math.max(...demandRows.map(r => parseFloat(r["Demand"] || r["Predicted Demand"] || 0)))) : null;
-  const criticalItems = demandRows.filter(r => parseFloat(r["Reorder"] || r["Reorder Qty"] || 0) > 0);
-  const highRisk   = riskRows.filter(r => parseFloat((r["Stockout"] || r["Stockout Probability"] || "0").replace("%", "")) > 30);
+  const demandRows   = demandData?.rows   || [];
+  const stockoutRows = stockoutData?.rows || [];
+  const supplierRows = supplierData?.rows || [];
+
+  const criticalItems = demandRows.filter(r =>
+    (r["Decision"] || r["decision"] || "").toUpperCase().includes("REORDER")
+  );
+  // Stockout Probability from backend is 0–1 float, so threshold is 0.5 (= 50%)
+  const highRiskItems = stockoutRows.filter(r =>
+    parseFloat(r["Stockout Probability"] ?? r["stockout_probability"] ?? 0) > 0.5
+  );
+  const anyDone = demandDone || stockoutDone || supplierDone || policyDone;
+
+  // Helper: render a section's AI summary box
+  const AISummary = ({ text }) => text ? (
+    <div style={{ marginTop: 14, background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 10, padding: "14px 16px", fontSize: "0.85rem", color: t.textSub, lineHeight: 1.65 }}>
+      <div style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>AI Summary</div>
+      <div dangerouslySetInnerHTML={{
+        __html: text
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+          .replace(/\n/g, "<br>")
+      }} />
+    </div>
+  ) : null;
+
+  const ErrorBox = ({ msg }) => msg ? (
+    <div style={{ background: t.dangerBg, border: `1px solid ${t.danger}30`, borderRadius: 10, padding: "14px 18px", fontSize: "0.84rem", color: t.danger }}>
+      Error: {msg}
+    </div>
+  ) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: t.bg, color: t.text, animation: "fadeIn .25s ease" }}>
@@ -666,13 +783,8 @@ function Dashboard({ t, sessionId, onBack, mode }) {
           </Btn>
           <div>
             <span style={{ fontFamily: "'Lora', serif", fontSize: "1.05rem", fontWeight: 500, color: t.text }}>MRP Dashboard</span>
-            <span style={{ marginLeft: 10, fontSize: "0.75rem", color: t.textMuted }}>Demand prediction &amp; supplier risk</span>
+            <span style={{ marginLeft: 10, fontSize: "0.75rem", color: t.textMuted }}>Demand · Stockout · Supplier · Policy</span>
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {!sessionId && (
-            <span style={{ fontSize: "0.78rem", color: t.textMuted, alignSelf: "center" }}>No file loaded — go back and upload first.</span>
-          )}
         </div>
       </div>
 
@@ -685,109 +797,126 @@ function Dashboard({ t, sessionId, onBack, mode }) {
           </div>
         ) : (
           <>
-            {/* Action buttons */}
+            {/* ── 4 Action Buttons ─────────────────────────────────────────── */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Btn onClick={runDemand} disabled={demandLoading || !sessionId} variant="primary" t={t}>
+              <Btn onClick={runDemand} disabled={demandLoading} variant="primary" t={t}>
                 {demandLoading ? <><SpinnerIcon /> Running LSTM...</> : "Run Demand Prediction"}
               </Btn>
-              <Btn onClick={runRisk} disabled={riskLoading || !sessionId} variant="primary" t={t}>
-                {riskLoading ? <><SpinnerIcon /> Analyzing...</> : "Analyze Supplier Risk"}
+              <Btn onClick={runStockout} disabled={stockoutLoading} variant="primary" t={t}>
+                {stockoutLoading ? <><SpinnerIcon /> Simulating...</> : "Stockout Risk (Monte Carlo)"}
               </Btn>
-              <Btn onClick={runPolicy} disabled={policyLoading || !sessionId} variant="primary" t={t}>
+              <Btn onClick={runSupplier} disabled={supplierLoading} variant="primary" t={t}>
+                {supplierLoading ? <><SpinnerIcon /> Clustering...</> : "Supplier Risk Clustering"}
+              </Btn>
+              <Btn onClick={runPolicy} disabled={policyLoading} variant="primary" t={t}>
                 {policyLoading ? <><SpinnerIcon /> Optimizing...</> : "Run Policy Optimization"}
               </Btn>
             </div>
 
-            {/* KPIs */}
-            {(demandDone || riskDone) && (
+            {/* ── KPI Strip (shown once any section is done) ───────────────── */}
+            {anyDone && (
               <>
                 <SectionHeader title="Key Metrics" t={t} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                  <KpiCard label="Avg Demand"     value={avgDemand?.toLocaleString() ?? "—"}  sub="predicted units"       t={t} />
-                  <KpiCard label="Max Demand"     value={maxDemand?.toLocaleString() ?? "—"}  sub="single material"       t={t} />
-                  <KpiCard label="Total Materials" value={demandRows.length || "—"}             sub="in dataset"            t={t} />
-                  <KpiCard label="Reorder Alerts"  value={criticalItems.length || "—"}          sub="need reorder"          t={t} />
-                  {riskDone && <KpiCard label="High-Risk Items" value={highRisk.length || "0"} sub="stockout &gt; 30%" t={t} />}
-                  {policyDone && policyData?.costSavings && <KpiCard label="Policy Savings" value={policyData.costSavings} sub="smart vs naive" t={t} />}
+                  {demandDone && (
+                    <KpiCard label="Total Materials" value={demandRows.length || "—"} sub="in dataset" t={t} />
+                  )}
+                  {demandDone && (
+                    <KpiCard label="Reorder Alerts" value={criticalItems.length} sub="materials need reorder" t={t} />
+                  )}
+                  {stockoutDone && (
+                    <KpiCard label="High Stockout Risk" value={highRiskItems.length} sub="> 50% probability" t={t} />
+                  )}
+                  {supplierDone && (
+                    <KpiCard
+                      label="High-Risk Suppliers"
+                      value={supplierRows.filter(r => r["Supplier_Risk"] === "High Risk").length}
+                      sub="flagged by clustering"
+                      t={t}
+                    />
+                  )}
+                  {policyDone && policyData?.costSavings && policyData.costSavings !== "—" && (
+                    <KpiCard label="Policy Savings" value={policyData.costSavings} sub="smart vs naive" t={t} />
+                  )}
                 </div>
               </>
             )}
 
-            {/* Demand section */}
-            {demandDone && (
+            {/* ── Section 1: Demand Forecast ───────────────────────────────── */}
+            {demandDone && demandData && (
               <>
-                <SectionHeader title="Demand Predictions" t={t} />
+                <SectionHeader title="Demand Forecast (LSTM)" t={t} />
                 {criticalItems.length > 0 && <AlertBanner count={criticalItems.length} t={t} />}
-
-                {demandRows.length > 0 && (
+                {demandData.graph && (
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 8 }}>Predicted demand by material</div>
-                    <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "16px", boxShadow: t.shadow }}>
-                      <BarChart
-                        data={demandRows}
-                        labelKey="Material"
-                        valueKey="Demand"
-                        color={t.chartLine}
-                        t={t}
-                        height={140}
-                      />
-                    </div>
+                    <GraphImage base64={demandData.graph} t={t} label="demand_forecast" />
                   </div>
                 )}
-
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
                   <Btn onClick={() => downloadCSV(demandRows, "demand_predictions.csv")} t={t}>
                     <DownloadIcon /> Download CSV
                   </Btn>
                 </div>
-                <DataTable rows={demandRows} t={t} />
-
-                {demandData?.answer && (
-                  <div style={{ marginTop: 14, background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 10, padding: "14px 16px", fontSize: "0.85rem", color: t.textSub, lineHeight: 1.65 }}>
-                    <div style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>AI Summary</div>
-                    <div dangerouslySetInnerHTML={{
-                      __html: demandData.answer
-                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                        .replace(/\n/g, "<br>")
-                    }} />
-                  </div>
-                )}
+                {demandRows.length > 0
+                  ? <DataTable rows={demandRows} t={t} />
+                  : <div style={{ fontSize: "0.82rem", color: t.textMuted, padding: "8px 0" }}>No tabular data to display.</div>
+                }
+                <AISummary text={demandData.answer} />
+                <ErrorBox msg={demandData.error} />
               </>
             )}
 
-            {/* Risk section */}
-            {riskDone && (
+            {/* ── Section 2: Stockout Risk ─────────────────────────────────── */}
+            {stockoutDone && stockoutData && (
               <>
-                <SectionHeader title="Supplier Risk Analysis" t={t} />
-
+                <SectionHeader title="Stockout Risk Analysis (Monte Carlo)" t={t} />
+                {stockoutData.graph && (
+                  <div style={{ marginBottom: 16 }}>
+                    <GraphImage base64={stockoutData.graph} t={t} label="stockout_risk" />
+                  </div>
+                )}
                 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                  <Btn onClick={() => downloadCSV(riskRows, "supplier_risk.csv")} t={t}>
+                  <Btn onClick={() => downloadCSV(stockoutRows, "stockout_risk.csv")} t={t}>
                     <DownloadIcon /> Download CSV
                   </Btn>
                 </div>
-                <DataTable rows={riskRows} t={t} />
-
-                {riskData?.answer && (
-                  <div style={{ marginTop: 14, background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 10, padding: "14px 16px", fontSize: "0.85rem", color: t.textSub, lineHeight: 1.65 }}>
-                    <div style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>AI Summary</div>
-                    <div dangerouslySetInnerHTML={{
-                      __html: riskData.answer
-                        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                        .replace(/\n/g, "<br>")
-                    }} />
-                  </div>
-                )}
+                {stockoutRows.length > 0
+                  ? <DataTable rows={stockoutRows} t={t} />
+                  : <div style={{ fontSize: "0.82rem", color: t.textMuted, padding: "8px 0" }}>No tabular data to display.</div>
+                }
+                <AISummary text={stockoutData.answer} />
+                <ErrorBox msg={stockoutData.error} />
               </>
             )}
 
-            {/* ── Policy Optimization Section ─────────────────────────────── */}
+            {/* ── Section 3: Supplier Risk ─────────────────────────────────── */}
+            {supplierDone && supplierData && (
+              <>
+                <SectionHeader title="Supplier Risk Clustering (K-Means)" t={t} />
+                {supplierData.graph && (
+                  <div style={{ marginBottom: 16 }}>
+                    <GraphImage base64={supplierData.graph} t={t} label="supplier_risk" />
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                  <Btn onClick={() => downloadCSV(supplierRows, "supplier_risk.csv")} t={t}>
+                    <DownloadIcon /> Download CSV
+                  </Btn>
+                </div>
+                {supplierRows.length > 0
+                  ? <DataTable rows={supplierRows} t={t} />
+                  : <div style={{ fontSize: "0.82rem", color: t.textMuted, padding: "8px 0" }}>No tabular data to display.</div>
+                }
+                <AISummary text={supplierData.answer} />
+                <ErrorBox msg={supplierData.error} />
+              </>
+            )}
+
+            {/* Policy section */}
             {policyDone && policyData && !policyData.error && (
               <>
                 <SectionHeader title="Policy Optimization" t={t} />
 
-                {/* Recommendation banner */}
                 <div style={{
                   background: policyData.recommended?.includes("Smart") ? t.positiveBg : t.surfaceAlt,
                   border: `1px solid ${policyData.recommended?.includes("Smart") ? t.positive + "40" : t.border}`,
@@ -801,7 +930,12 @@ function Dashboard({ t, sessionId, onBack, mode }) {
                   </div>
                 </div>
 
-                {/* KPI cards */}
+                {policyData.graph && (
+                  <div style={{ marginBottom: 16 }}>
+                    <GraphImage base64={policyData.graph} t={t} label="policy_optimization" />
+                  </div>
+                )}
+
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
                   <KpiCard label="Cost Savings"       value={policyData.costSavings}    sub="vs naive policy"   t={t} />
                   <KpiCard label="Stockout Reduction"  value={policyData.stockoutReduce} sub="fewer events"      t={t} />
@@ -811,23 +945,22 @@ function Dashboard({ t, sessionId, onBack, mode }) {
                   <KpiCard label="Service Level"       value={policyData.serviceLevel}   sub="target fill rate"  t={t} />
                 </div>
 
-                {/* Side-by-side comparison bars */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                   <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "18px 20px", boxShadow: t.shadow }}>
                     <div style={{ fontSize: "0.8rem", fontWeight: 500, color: t.text, marginBottom: 14 }}>Cost Comparison</div>
-                    <PolicyCompareChart naive={policyData.naiveCost}      smart={policyData.smartCost}      label="Total Cost ($)"     t={t} />
-                    <PolicyCompareChart naive={policyData.naiveStockouts} smart={policyData.smartStockouts} label="Stockout Events"    t={t} />
-                    <PolicyCompareChart naive={policyData.naiveAvgInv}    smart={policyData.smartAvgInv}    label="Avg Inventory (units)" t={t} />
+                    <PolicyCompareChart naive={policyData.naiveCost}      smart={policyData.smartCost}      label="Total Cost ($)"        t={t} />
+                    <PolicyCompareChart naive={policyData.naiveStockouts} smart={policyData.smartStockouts} label="Stockout Events"        t={t} />
+                    <PolicyCompareChart naive={policyData.naiveAvgInv}    smart={policyData.smartAvgInv}    label="Avg Inventory (units)"  t={t} />
                   </div>
                   <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, padding: "18px 20px", boxShadow: t.shadow }}>
                     <div style={{ fontSize: "0.8rem", fontWeight: 500, color: t.text, marginBottom: 14 }}>Policy Parameters</div>
                     {[
-                      ["Reorder Point",   policyData.rop],
-                      ["Order Quantity",  policyData.orderQty],
-                      ["Safety Stock",    policyData.safetyStock],
-                      ["Lead Time",       policyData.leadTime],
-                      ["Service Level",   policyData.serviceLevel],
-                      ["Supplier Risk",   policyData.supplierRisk],
+                      ["Reorder Point",  policyData.rop],
+                      ["Order Quantity", policyData.orderQty],
+                      ["Safety Stock",   policyData.safetyStock],
+                      ["Lead Time",      policyData.leadTime],
+                      ["Service Level",  policyData.serviceLevel],
+                      ["Supplier Risk",  policyData.supplierRisk],
                     ].map(([label, val]) => (
                       <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${t.borderSoft}` }}>
                         <span style={{ fontSize: "0.78rem", color: t.textMuted }}>{label}</span>
@@ -837,7 +970,6 @@ function Dashboard({ t, sessionId, onBack, mode }) {
                   </div>
                 </div>
 
-                {/* Raw model output */}
                 <details style={{ marginBottom: 14 }}>
                   <summary style={{ fontSize: "0.72rem", color: t.textMuted, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, userSelect: "none" }}>
                     View raw simulation output
@@ -847,12 +979,11 @@ function Dashboard({ t, sessionId, onBack, mode }) {
                   </div>
                 </details>
 
-                {/* AI summary */}
                 {policyData.answer && (
                   <div style={{ background: t.surfaceAlt, border: `1px solid ${t.border}`, borderRadius: 10, padding: "14px 16px", fontSize: "0.85rem", color: t.textSub, lineHeight: 1.65 }}>
                     <div style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>AI Recommendation</div>
                     <div dangerouslySetInnerHTML={{
-                      __html: policyData.answer
+                      __html: (policyData.answer || "")
                         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
                         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                         .replace(/\n/g, "<br>")
@@ -868,11 +999,10 @@ function Dashboard({ t, sessionId, onBack, mode }) {
               </div>
             )}
 
-            {/* Empty state */}
-            {!demandDone && !riskDone && !policyDone && !demandLoading && !riskLoading && !policyLoading && (
+            {!anyDone && !demandLoading && !stockoutLoading && !supplierLoading && !policyLoading && (
               <div style={{ textAlign: "center", padding: "60px 20px", color: t.textMuted }}>
                 <div style={{ fontFamily: "'Lora', serif", fontSize: "1.1rem", color: t.textSub, marginBottom: 8 }}>Ready to analyse</div>
-                <div style={{ fontSize: "0.85rem" }}>Click one of the buttons above to run your models.</div>
+                <div style={{ fontSize: "0.85rem" }}>Click one of the four buttons above to run a model.</div>
               </div>
             )}
           </>
@@ -888,7 +1018,7 @@ function Dashboard({ t, sessionId, onBack, mode }) {
 export default function App() {
   injectBase();
 
-  const [page, setPage]           = useState("chat"); // "chat" | "dashboard"
+  const [page, setPage]           = useState("chat");
   const [mode, setMode]           = useState("light");
   const [sessionId, setSessionId] = useState(null);
   const [meta, setMeta]           = useState(null);
@@ -928,13 +1058,16 @@ export default function App() {
     text = text?.trim();
     if (!text || loading) return;
     if (!sessionId) { showToast("Please upload a file first"); return; }
-    setMessages(prev => [...prev,
+
+    setMessages(prev => [
+      ...prev,
       { role: "user", content: text },
-      { role: "assistant", content: "", raw: null, typing: true },
+      { role: "assistant", content: "", typing: true },
     ]);
     setLoading(true);
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "";
+
     try {
       const res = await fetch(`${API}/chat`, {
         method: "POST",
@@ -943,9 +1076,22 @@ export default function App() {
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
       const data = await res.json();
-      setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: data.answer, raw: data.raw_output, typing: false }]);
+
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        {
+          role: "assistant",
+          content: data.answer || "No response.",
+          raw_output: data.raw_output || null,
+          graph: data.graph || null,
+          typing: false,
+        },
+      ]);
     } catch (err) {
-      setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: "Something went wrong: " + err.message, raw: null, typing: false }]);
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: "assistant", content: `Something went wrong: ${err.message}`, raw_output: null, graph: null, typing: false },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -961,12 +1107,11 @@ export default function App() {
     e.target.style.height = Math.min(e.target.scrollHeight, 130) + "px";
   };
 
-  // ── Dashboard page ───────────────────────────────────────────────────────────
+  // Dashboard page
   if (page === "dashboard") {
     return (
       <>
-        <Dashboard t={t} sessionId={sessionId} onBack={() => setPage("chat")} mode={mode} />
-        {/* Toast */}
+        <Dashboard t={t} sessionId={sessionId} onBack={() => setPage("chat")} />
         <div style={{
           position: "fixed", bottom: 24, left: "50%",
           transform: `translateX(-50%) translateY(${toast.show ? 0 : 50}px)`,
@@ -981,7 +1126,7 @@ export default function App() {
     );
   }
 
-  // ── Chat page ────────────────────────────────────────────────────────────────
+  // Chat page
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: t.bg, color: t.text }}>
       <Sidebar t={t} meta={meta} onUpload={handleUpload} onSuggestion={handleSend} onClear={() => setMessages([])} loading={loading} />
@@ -1005,7 +1150,6 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {/* Dashboard button */}
             <button
               onClick={() => setPage("dashboard")}
               style={{
@@ -1021,7 +1165,6 @@ export default function App() {
               <GridIcon /> Dashboard
             </button>
 
-            {/* Theme toggle */}
             <button
               onClick={() => setMode(m => m === "light" ? "dark" : "light")}
               style={{
