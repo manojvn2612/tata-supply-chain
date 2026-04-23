@@ -12,9 +12,6 @@ MODEL_PATH = "model_weights/lstm_model.h5"
 SCALER_X_PATH = "model_weights/scalerX.save"
 SCALER_Y_PATH = "model_weights/scalerY.save"
 
-# -----------------------------
-# Helpers
-# -----------------------------
 def parse_series(text):
     if pd.isna(text):
         return []
@@ -24,9 +21,7 @@ def extract_po(text):
     match = re.search(r":\s*(\d+)", str(text))
     return float(match.group(1)) if match else 0
 
-# -----------------------------
-# Train Model (only once)
-# -----------------------------
+# Train Model
 def train_model(df):
     X, y = [], []
     window = 4
@@ -73,9 +68,7 @@ def train_model(df):
 
     return model, scalerX, scalery
 
-# -----------------------------
-# Load or Train
-# -----------------------------
+# Load Model
 def get_model(df):
     if os.path.exists(MODEL_PATH):
         # Load model without compiling to avoid deserialization errors from legacy metrics/losses
@@ -88,9 +81,7 @@ def get_model(df):
         model, scalerX, scalery = train_model(df)
     return model, scalerX, scalery
 
-# -----------------------------
-# MAIN FUNCTION (used by agent)
-# -----------------------------
+# Main Function it will called by agent to run lstm demand and return results
 def run_lstm_demand_forecast(df):
 
     df = df.copy()
@@ -133,19 +124,17 @@ def run_lstm_demand_forecast(df):
     results["Open PO"] = df["Available PO (Open)"]
     results["Lead Time"] = df["Lead Time Supplier→Plant (Days)"]
 
-    # 🔥 ROP
     results["ROP"] = (
         results["Predicted Demand"] * results["Lead Time"]
         + results["Safety Stock"]
     )
 
-    # 🔥 Decision
     results["Decision"] = results.apply(
         lambda x: "REORDER" if (x["Stock"] + x["Open PO"]) < x["ROP"] else "NO ACTION",
         axis=1
     )
 
-    # 🔥 Reorder Qty
+    #reorder formula = max(ROP - (Stock + Open PO), 0)
     results["Reorder Qty"] = results.apply(
         lambda x: max(x["ROP"] - (x["Stock"] + x["Open PO"]), 0),
         axis=1

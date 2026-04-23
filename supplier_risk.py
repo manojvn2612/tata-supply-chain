@@ -29,6 +29,7 @@ def run_supplier_risk(df):
     X = df[features]
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
+<<<<<<< HEAD
     kmeans = KMeans(n_clusters=3, random_state=42)
     df["Cluster"] = kmeans.fit_predict(X_scaled)
     cluster_mean = df.groupby("Cluster")["Total_Time"].mean()
@@ -40,4 +41,24 @@ def run_supplier_risk(df):
     }
     df["Supplier_Risk"] = df["Cluster"].map(risk_map)
     score = silhouette_score(X_scaled, df["Cluster"])
+=======
+
+    n_samples = len(df)
+    n_clusters = min(3, max(2, n_samples - 1))
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    df["Cluster"] = kmeans.fit_predict(X_scaled)
+    cluster_mean = df.groupby("Cluster")["Total_Time"].mean()
+    sorted_clusters = cluster_mean.sort_values().index
+
+    risk_labels = ["Low Risk", "Medium Risk", "High Risk"]
+    risk_map = {sorted_clusters[i]: risk_labels[i] for i in range(n_clusters)}
+    df["Supplier_Risk"] = df["Cluster"].map(risk_map)
+
+    try:
+        score = silhouette_score(X_scaled, df["Cluster"])
+    except Exception:
+        score = 0.0
+
+>>>>>>> parent of 9635d4f (Final Commit with all changes)
     return df, score
